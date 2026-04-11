@@ -7,6 +7,9 @@ project(STRUMOK_AVX2
     LANGUAGES C
 )
 
+option(STRUMOK_BUILD_LIB_ONLY "Build only the STRUMOK library." OFF)
+option(STRUMOK_BUILD_SHARED "Build STRUMOK as a shared library (DLL/.so) instead of static." OFF)
+
 if(NOT CMAKE_C_COMPILER_ID STREQUAL "GNU")
     message(WARNING
         "This project targets GCC 15+ for complete C23 support. "
@@ -55,15 +58,46 @@ if(NOT STRUMOK_HAVE_AVX2)
     message(FATAL_ERROR "AVX2 support is required but was not detected with ${STRUMOK_AVX2_FLAG}.")
 endif()
 
-file(GLOB SOURCES CONFIGURE_DEPENDS
-    *.c
+set(STRUMOK_API_SOURCES
+    strumok.c
+    strumok_tables.c
 )
 
-add_executable(${PROJECT_NAME} ${SOURCES})
+set(STRUMOK_LIBRARY_TYPE STATIC)
+if(STRUMOK_BUILD_SHARED)
+    set(STRUMOK_LIBRARY_TYPE SHARED)
+endif()
+
+add_library(STRUMOK ${STRUMOK_LIBRARY_TYPE} ${STRUMOK_API_SOURCES})
+target_include_directories(STRUMOK PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+if(STRUMOK_BUILD_SHARED AND WIN32)
+    set_target_properties(STRUMOK PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+endif()
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
-    target_compile_options(${PROJECT_NAME} PRIVATE -O3)
+    target_compile_options(STRUMOK PRIVATE -O3)
+endif()
+
+if(CMAKE_C_COMPILER_ID STREQUAL "MSVC")
+    target_compile_options(STRUMOK PRIVATE /O3)
 endif()
 
 message(STATUS "Building AVX2 target with ${STRUMOK_AVX2_FLAG}.")
-target_compile_options(${PROJECT_NAME} PRIVATE ${STRUMOK_AVX2_FLAG})
+target_compile_options(STRUMOK PRIVATE ${STRUMOK_AVX2_FLAG})
+
+if(NOT STRUMOK_BUILD_LIB_ONLY)
+    add_executable(${PROJECT_NAME}
+        use-example.c
+        strumok_selftest.c
+        strumok_benchmark.c
+    )
+
+    target_link_libraries(${PROJECT_NAME} PRIVATE STRUMOK)
+
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+        target_compile_options(${PROJECT_NAME} PRIVATE -O3)
+    endif()
+
+    target_compile_options(${PROJECT_NAME} PRIVATE ${STRUMOK_AVX2_FLAG})
+endif()
