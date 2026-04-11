@@ -1,62 +1,33 @@
-#include <immintrin.h>
 #include <stdint.h>
-#include <stddef.h>
+#include <stdio.h>
+#include <string.h>
 
-#include "strumok_tables.h"
+#include "strumok.h"
+#include "strumok_selftest.h"
 
+int main(void) {
+    uint8_t sample[64];
+    strumok_state demo_state;
 
-static inline uint64_t
-a_mul(const uint64_t x) {
-  return ( ( (x) << 8 ) ^ ( strumok_alpha_mul[x >> 56] ) );
-}
+    memset(sample, 0x5a, sizeof(sample));
+    strumok256_init(
+        &demo_state,
+        (const uint64_t[]){0x8000000000000000ULL, 0x0000000000000000ULL, 0x0000000000000000ULL, 0x0000000000000000ULL},
+        (const uint64_t[]){0x0000000000000004ULL, 0x0000000000000003ULL, 0x0000000000000002ULL, 0x0000000000000001ULL});
+    strumok_xor_keystream(&demo_state, sample, sizeof(sample));
 
+#if defined(STRUMOK_HAVE_AVX2)
+    printf("STRUMOK AVX2 path: enabled\n");
+#else
+    printf("STRUMOK AVX2 path: disabled, scalar fallback\n");
+#endif
 
-static inline uint64_t
-ainv_mul(const uint64_t x) {
-  return ( ( (x) >> 8 ) ^ ( strumok_alphainv_mul[x & 0xff] ) );
-}
-
-
-static inline uint64_t
-transform_T(const uint64_t x) {
-  return ((strumok_T0[  x        & 0xff ]) ^
-          (strumok_T1[ (x >>  8) & 0xff ]) ^
-          (strumok_T2[ (x >> 16) & 0xff ]) ^
-          (strumok_T3[ (x >> 24) & 0xff ]) ^
-          (strumok_T4[ (x >> 32) & 0xff ]) ^
-          (strumok_T5[ (x >> 40) & 0xff ]) ^
-          (strumok_T6[ (x >> 48) & 0xff ]) ^
-          (strumok_T7[ (x >> 56) & 0xff ]));
-}
-
-void encrypt_stream_avx2(uint8_t *data, const uint8_t *keystream, size_t length) {
-    size_t i = 0;
-    
-    for (; i + 31 < length; i += 32) {
-        __m256i d = _mm256_loadu_si256((__m256i*)&data[i]);
-        __m256i k = _mm256_loadu_si256((__m256i*)&keystream[i]);
-        
-        __m256i r = _mm256_xor_si256(d, k);
-        
-        _mm256_storeu_si256((__m256i*)&data[i], r);
+    const int failed = strumok_run_self_tests();
+    if (failed == 0) {
+        printf("All STRUMOK-256/512 test vectors passed.\n");
+        return 0;
     }
-    
-    for (; i < length; i++) {
-        data[i] ^= keystream[i];
-    }
-}
 
-
-void shift_lfsr_avx2(uint64_t *state) {
-    // load state blocks
-    __m256i block1 = _mm256_loadu_si256((__m256i*)&state[1]);
-    __m256i block2 = _mm256_loadu_si256((__m256i*)&state[5]);
-    __m256i block3 = _mm256_loadu_si256((__m256i*)&state[9]);
-    __m256i block4 = _mm256_loadu_si256((__m256i*)&state[13]);
-
-    // shift by -1
-    _mm256_storeu_si256((__m256i*)&state[0], block1);
-    _mm256_storeu_si256((__m256i*)&state[4], block2);
-    _mm256_storeu_si256((__m256i*)&state[8], block3);
-    _mm256_storeu_si256((__m256i*)&state[12], block4);
+    printf("Self-test failed: %d vector(s) mismatched.\n", failed);
+    return 1;
 }
