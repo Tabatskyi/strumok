@@ -22,9 +22,9 @@ static void bench_mode_256(uint8_t *buffer, size_t bytes, int rounds) {
     double avg_mib_s = 0.0;
     uint8_t checksum = 0;
 
-    for (int r = 0; r < rounds; ++r) {
+    for (int round = 0; round < rounds; ++round) {
         strumok_state state;
-        memset(buffer, (unsigned char)(0xA5 ^ r), bytes);
+        memset(buffer, (unsigned char)(0xA5 ^ round), bytes);
         strumok256_init(&state, key, iv);
 
         const double start = now_seconds();
@@ -37,7 +37,7 @@ static void bench_mode_256(uint8_t *buffer, size_t bytes, int rounds) {
         }
         avg_mib_s += mib_per_s;
 
-        checksum ^= buffer[(size_t)(r * 7919u) % bytes];
+        checksum ^= buffer[(size_t)(round * 7919u) % bytes]; // so compiler doesn't optimize away the loop
     }
 
     avg_mib_s /= (double)rounds;
@@ -66,9 +66,9 @@ static void bench_mode_512(uint8_t *buffer, size_t bytes, int rounds) {
     double avg_mib_s = 0.0;
     uint8_t checksum = 0;
 
-    for (int r = 0; r < rounds; ++r) {
+    for (int round = 0; round < rounds; ++round) {
         strumok_state state;
-        memset(buffer, (unsigned char)(0x3C ^ r), bytes);
+        memset(buffer, (unsigned char)(0x3C ^ round), bytes);
         strumok512_init(&state, key, iv);
 
         const double start = now_seconds();
@@ -81,7 +81,7 @@ static void bench_mode_512(uint8_t *buffer, size_t bytes, int rounds) {
         }
         avg_mib_s += mib_per_s;
 
-        checksum ^= buffer[(size_t)(r * 7919u) % bytes];
+        checksum ^= buffer[(size_t)(round * 7919u) % bytes];
     }
 
     avg_mib_s /= (double)rounds;
