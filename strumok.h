@@ -11,6 +11,7 @@
 
 typedef struct {
     uint64_t sa[16];
+    uint8_t head;
     uint64_t reg1;
     uint64_t reg2;
 } strumok_state;
