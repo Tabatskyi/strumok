@@ -23,48 +23,42 @@ static inline uint64_t fsm(uint64_t x, uint64_t y, uint64_t z) {
     return (x + y) ^ z;
 }
 
-static inline void shift_lfsr(uint64_t s[16]) {
-#if defined(STRUMOK_HAVE_AVX2)
-    __m256i v0 = _mm256_loadu_si256((const __m256i *)&s[1]);
-    __m256i v1 = _mm256_loadu_si256((const __m256i *)&s[5]);
-    __m256i v2 = _mm256_loadu_si256((const __m256i *)&s[9]);
+static inline void shift_lfsr(uint64_t sa[16]) {
+    const __m256i v0 = _mm256_loadu_si256((const __m256i *)&sa[1]);
+    const __m256i v1 = _mm256_loadu_si256((const __m256i *)&sa[5]);
+    const __m256i v2 = _mm256_loadu_si256((const __m256i *)&sa[9]);
 
-    _mm256_storeu_si256((__m256i *)&s[0], v0);
-    _mm256_storeu_si256((__m256i *)&s[4], v1);
-    _mm256_storeu_si256((__m256i *)&s[8], v2);
-    s[12] = s[13];
-    s[13] = s[14];
-    s[14] = s[15];
-#else
-    for (int j = 0; j < 15; ++j) {
-        s[j] = s[j + 1];
-    }
-#endif
+    _mm256_storeu_si256((__m256i *)&sa[0], v0);
+    _mm256_storeu_si256((__m256i *)&sa[4], v1);
+    _mm256_storeu_si256((__m256i *)&sa[8], v2);
+    sa[12] = sa[13];
+    sa[13] = sa[14];
+    sa[14] = sa[15];
 }
 
 static inline uint64_t strumok_output_word(const strumok_state *state) {
-    return fsm(state->s[15], state->r1, state->r2) ^ state->s[0];
+    return fsm(state->sa[15], state->reg1, state->reg2) ^ state->sa[0];
 }
 
 static void strumok_next(strumok_state *state, int init_mode) {
-    const uint64_t s0 = state->s[0];
-    const uint64_t s11 = state->s[11];
-    const uint64_t s13 = state->s[13];
-    const uint64_t s15 = state->s[15];
+    const uint64_t s0 = state->sa[0];
+    const uint64_t s11 = state->sa[11];
+    const uint64_t s13 = state->sa[13];
+    const uint64_t s15 = state->sa[15];
 
-    const uint64_t f = fsm(s15, state->r1, state->r2);
-    const uint64_t next_r2 = transform_T(state->r1);
-    const uint64_t next_r1 = state->r2 + s13;
+    const uint64_t f = fsm(s15, state->reg1, state->reg2);
+    const uint64_t next_r2 = transform_T(state->reg1);
+    const uint64_t next_r1 = state->reg2 + s13;
 
     uint64_t next_s15 = a_mul(s0) ^ ainv_mul(s11) ^ s13;
     if (init_mode) {
         next_s15 ^= f;
     }
 
-    shift_lfsr(state->s);
-    state->s[15] = next_s15;
-    state->r1 = next_r1;
-    state->r2 = next_r2;
+    shift_lfsr(state->sa);
+    state->sa[15] = next_s15;
+    state->reg1 = next_r1;
+    state->reg2 = next_r2;
 }
 
 uint64_t strumok_next_word(strumok_state *state) {
@@ -84,25 +78,25 @@ void strumok256_init(strumok_state *state, const uint64_t key[4], const uint64_t
     const uint64_t IV1 = iv[2];
     const uint64_t IV0 = iv[3];
 
-    state->s[15] = ~K0;
-    state->s[14] = K1;
-    state->s[13] = ~K2;
-    state->s[12] = K3;
-    state->s[11] = K0;
-    state->s[10] = ~K1;
-    state->s[9] = K2;
-    state->s[8] = K3;
-    state->s[7] = ~K0;
-    state->s[6] = ~K1;
-    state->s[5] = K2 ^ IV3;
-    state->s[4] = K3;
-    state->s[3] = K0 ^ IV2;
-    state->s[2] = K1 ^ IV1;
-    state->s[1] = K2;
-    state->s[0] = K3 ^ IV0;
+    state->sa[15] = ~K0;
+    state->sa[14] = K1;
+    state->sa[13] = ~K2;
+    state->sa[12] = K3;
+    state->sa[11] = K0;
+    state->sa[10] = ~K1;
+    state->sa[9] = K2;
+    state->sa[8] = K3;
+    state->sa[7] = ~K0;
+    state->sa[6] = ~K1;
+    state->sa[5] = K2 ^ IV3;
+    state->sa[4] = K3;
+    state->sa[3] = K0 ^ IV2;
+    state->sa[2] = K1 ^ IV1;
+    state->sa[1] = K2;
+    state->sa[0] = K3 ^ IV0;
 
-    state->r1 = 0;
-    state->r2 = 0;
+    state->reg1 = 0;
+    state->reg2 = 0;
 
     for (int i = 0; i < 32; ++i) {
         strumok_next(state, 1);
@@ -126,25 +120,25 @@ void strumok512_init(strumok_state *state, const uint64_t key[8], const uint64_t
     const uint64_t IV1 = iv[2];
     const uint64_t IV0 = iv[3];
 
-    state->s[15] = K0;
-    state->s[14] = ~K1;
-    state->s[13] = K2;
-    state->s[12] = K3;
-    state->s[11] = ~K7;
-    state->s[10] = K5;
-    state->s[9] = ~K6;
-    state->s[8] = K4 ^ IV3;
-    state->s[7] = ~K0;
-    state->s[6] = K1;
-    state->s[5] = K2 ^ IV2;
-    state->s[4] = K3;
-    state->s[3] = K4 ^ IV1;
-    state->s[2] = K5;
-    state->s[1] = K6;
-    state->s[0] = K7 ^ IV0;
+    state->sa[15] = K0;
+    state->sa[14] = ~K1;
+    state->sa[13] = K2;
+    state->sa[12] = K3;
+    state->sa[11] = ~K7;
+    state->sa[10] = K5;
+    state->sa[9] = ~K6;
+    state->sa[8] = K4 ^ IV3;
+    state->sa[7] = ~K0;
+    state->sa[6] = K1;
+    state->sa[5] = K2 ^ IV2;
+    state->sa[4] = K3;
+    state->sa[3] = K4 ^ IV1;
+    state->sa[2] = K5;
+    state->sa[1] = K6;
+    state->sa[0] = K7 ^ IV0;
 
-    state->r1 = 0;
-    state->r2 = 0;
+    state->reg1 = 0;
+    state->reg2 = 0;
 
     for (int i = 0; i < 32; ++i) {
         strumok_next(state, 1);
@@ -164,17 +158,10 @@ void strumok_xor_keystream(strumok_state *state, uint8_t *data, size_t length) {
             strumok_next_word(state),
         };
 
-#if defined(STRUMOK_HAVE_AVX2)
         const __m256i d = _mm256_loadu_si256((const __m256i *)(data + i));
         const __m256i k = _mm256_loadu_si256((const __m256i *)stream_words);
         const __m256i r = _mm256_xor_si256(d, k);
         _mm256_storeu_si256((__m256i *)(data + i), r);
-#else
-        const uint8_t *stream = (const uint8_t *)stream_words;
-        for (size_t j = 0; j < 32; ++j) {
-            data[i + j] ^= stream[j];
-        }
-#endif
     }
 
     if (i < length) {

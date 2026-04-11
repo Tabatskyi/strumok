@@ -5,16 +5,14 @@
 #include <stdint.h>
 #include <string.h>
 
-#if defined(STRUMOK_HAVE_AVX2)
 #include <immintrin.h>
-#endif
 
 #include "strumok_tables.h"
 
 typedef struct {
-    uint64_t s[16];
-    uint64_t r1;
-    uint64_t r2;
+    uint64_t sa[16];
+    uint64_t reg1;
+    uint64_t reg2;
 } strumok_state;
 
 void strumok256_init(strumok_state *state, const uint64_t key[4], const uint64_t iv[4]);
